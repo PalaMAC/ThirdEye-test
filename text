@@ -1,0 +1,183 @@
+import React, { useState, useEffect, useRef} from 'react'
+import { StyleSheet, Text, View, Image, SafeAreaView } from 'react-native';
+import {Camera,CameraType} from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
+import Button from './src/components/Button';
+import { Video } from 'expo-av';
+import {shareAsync} from 'expo-sharing';
+
+export default function App() {
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const [hasMicrophonePermission, setHasMicrophonePermission] = useState(null);
+  const [hasMediaLibraryPermission, setHasMediaLibraryPermission] = useState(null);
+  const [image, setImage] = useState(null);
+  const [type, setType] = useState(Camera.Constants.Type.back);
+  const [flash, setFlash] = useState(Camera.Constants.FlashMode.off);
+  const cameraRef = useRef(null);
+  const [isRecording, setIsRecording] = useState(null);
+  const [video, setVideo] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      MediaLibrary.requestPermissionsAsync();
+      const cameraStatus = await Camera.requestCameraPermissionsAsync();
+      const microphonePermission = await Camera.requestMicrophonePermissionsAsync();
+      const mediaLibraryPermission = await MediaLibrary.requestPermissionsAsync();
+      setHasCameraPermission(cameraStatus.status === 'granted');
+      setHasMicrophonePermission(microphonePermission.status === 'granted');
+      setHasMediaLibraryPermission(mediaLibraryPermission.status === 'granted');
+    })();
+},  [])
+
+// const takePicture = async() => {
+//  if(cameraRef){
+//     try{
+//      const data = await cameraRef.current.takePictureAsync();
+//      console.log(data);
+//      setImage(data.uri);   
+//   } catch(e){
+//      console.log(e);
+//
+//    }
+// }
+//} 
+//const saveImage = async() => {
+//  if(image){
+//    try{
+//     await MediaLibrary.createAssetAsync(image);
+//      alert('Picture saved!')
+//      setImage(null);
+//    } catch(e){
+//      console.log(e)
+//    }
+//  }
+//}
+
+if(hasCameraPermission === false || hasMicrophonePermission === false) {
+  return <Text>No Access to Camera or microphone</Text>
+} else if (!hasCameraPermission) {
+  return <Text>Permission for camera not granted</Text>
+} 
+
+let recordVideo = () => {
+    setIsRecording(true);
+    let options = {
+      quality: "1080p",
+      maxDuration: 60,
+      mute: false
+    };
+    cameraRef.current.recordAsync(options).then((recordedVideo) => {
+      setVideo(recordedVideo);
+      setIsRecording(false)
+    });
+  };
+
+let stopRecording = () => {
+    setIsRecording(false);
+    cameraRef.current.stopRecording();
+};
+
+if (video) {
+  let shareVideo = () => {
+    shareAsync(video.uri).then(() => {
+      setVideo();
+    });
+  };
+
+  let saveVideo = () => {
+    MediaLibrary.saveToLibraryAsync(video.uri).then(() => {
+      setVideo();
+    });
+  }
+
+  return (
+  <SafeAreaView style={styles.container}>
+    <Video
+      style = {StyleSheet.video}
+      source={{uri: video.uri}}
+      useNativeControls
+      resizeMode = 'contain'
+      isLooping
+    />
+    <Button title= "Share" onPress={shareVideo} />
+    {hasMediaLibraryPermission ? <Button title = "Save" onPress={saveVideo} /> : undefined }
+    <Button title= "Discard" onPress={() => setVideo(undefined)} />
+  </SafeAreaView>
+  );
+}
+
+  return (
+    <View style={styles.container}>
+     {!image ?
+      <Camera
+        style = {styles.camera}
+        type = {type}
+        flashMode={flash}
+        ref={cameraRef}
+      >
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+         padding: 30,
+
+       }}>
+
+          
+          <Button icon={'retweet'} onPress={() => {
+           setType(type === CameraType.back ? CameraType.front : CameraType.back)
+
+          }}/>
+          <Button icon ={'flash'} 
+            color = {flash === Camera.Constants.FlashMode.off ? 'gray': '#f1f1f1'}
+            onPress={() => {
+            setFlash(flash === Camera.Constants.FlashMode.off)
+           ? Camera.Constants.FlashMode.on
+           : Camera.Constants.FlashMode.off
+          }}/>
+
+        </View>
+        <View style = {styles.buttonContainer}>
+            <Button title = {isRecording ? "Stop Recording" : "Record Video"} onPress={recordVideo} />
+          </View>
+     </Camera>
+     :
+      <Image source={{uri: image}} style= {styles.camera}/>
+      }
+      <View>
+        {image ?
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          paddingHorizontal: 50
+        }}>
+          <Button title={"Retake Picture"} icon ="retweet" onPress={() => setImage(null)} />
+          <Button title={"Save"} icon ="check" onPress={saveImage} />
+        </View>
+       :
+       <Button title={'Take a Picture'} icon="camera" onPress={takePicture}/>
+        }
+     </View>
+   </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    paddingBottom: 20
+  },
+  camera: {
+    flex:1,
+    borderRadius:20,
+  },
+  buttonContainer: {
+    backgroundColor: "#fff",
+    alignSelf: "flex-end"
+  },
+  video: {
+    flex: 1,
+    alignSelf: "stretch"
+  }
+});
