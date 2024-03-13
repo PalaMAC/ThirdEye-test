@@ -17,6 +17,7 @@ export default function App() {
   const cameraRef = useRef(null);
   const [isRecording, setIsRecording] = useState(null);
   const [video, setVideo] = useState(null);
+  const [videoUri, setVideoUri] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -36,8 +37,9 @@ if (hasCameraPermission === undefined || hasMicrophonePermission === undefined) 
   return <Text>Permission for camera not granted.</Text>
 }
 
-let recordVideo = () => {
+const recordVideo = () => {
   setIsRecording(true);
+  setVideoUri(recordVideo.uri)
   let options = {
     quality: "1080p",
     maxDuration: 60,
@@ -50,7 +52,7 @@ let recordVideo = () => {
   });
 };
 
-let stopRecording = () => {
+const stopRecording = () => {
   setIsRecording(false);
   cameraRef.current.stopRecording();
 };
@@ -62,10 +64,40 @@ if (video) {
     });
   };
 
-  let saveVideo = () => {
+  const saveVideo = () => {
     MediaLibrary.saveToLibraryAsync(video.uri).then(() => {
       setVideo(undefined);
     });
+  };
+
+  const handleVideoRecorded = (recordedVideo) => {
+    setVideo(recordedVideo);
+    setIsRecording(false);
+    // Optionally, upload immediately or call this function on button press
+    uploadVideo(recordedVideo.uri);
+  };
+
+  const uploadVideo = async () => { 
+    const formData = new FormData();
+    formData.append('video', {
+      uri: videoUri,
+      type: 'video/quicktime', 
+      name: 'upload.mov', 
+    });
+    
+    try {
+      const response = await fetch('http://127.0.0.1:5000', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      const result = await response.text();
+      console.log('Upload success:', result);
+    } catch (error) {
+      console.error('Upload error:', error);
+    }
   };
 
   return (
@@ -81,7 +113,7 @@ if (video) {
         ref={cameraRef}
       />
       <Button title="Share" onPress={shareVideo} />
-      {hasMediaLibraryPermission ? <Button title="Save" onPress={saveVideo} /> : undefined}
+      {hasMediaLibraryPermission ? <Button title="Upload" onPress={uploadVideo} /> : undefined}
       <Button title="Discard" onPress={() => setVideo(undefined)} />
     </SafeAreaView>
   );
